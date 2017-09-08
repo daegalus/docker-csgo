@@ -104,7 +104,8 @@ RUN ./linuxgsm.sh csgoserver
 
 # Run Install Script
 RUN ./csgoserver auto-install
-
+RUN wget https://raw.githubusercontent.com/GameServerManagers/LinuxGSM/master/lgsm/functions/command_debug.sh -O lgsm/functions/command_debug.sh
+RUN chmod +x lgsm/functions/command_debug.sh
 RUN cp ./lgsm/config-lgsm/csgoserver/_default.cfg ./lgsm/config-lgsm/csgoserver/common.cfg
 
 # Edit Server Script to hold Docker Environmental Varables
@@ -129,7 +130,13 @@ RUN sed -i '/emailnotification=/s/"\([^"]*\)"/"$EMAIL_NOTIFICATION"/' ./lgsm/con
     sed -i '/gslt=/s/"\([^"]*\)"/"$GSLT"/' ./lgsm/config-lgsm/csgoserver/common.cfg
 
 # Make Start Script
-RUN echo '# Docker Start / Run Script' > start.sh && \
+RUN echo '#!/bin/sh' > start.sh && \
+    echo '# Docker Start / Run Script' >> start.sh && \
+    echo '' >> start.sh && \
+    echo '# Override GSLT form command line launch' >> start.sh && \
+    echo 'if [ ! -z "$1" ]; then' >> start.sh && \
+    echo '  export GSLT=$1' >> start.sh && \
+    echo 'fi' >> start.sh && \
     echo '' >> start.sh && \
     echo '# Edit Server Config to hold Docker Environmental Varables' >> start.sh && \
     echo '# ------------------' >> start.sh && \
@@ -138,16 +145,17 @@ RUN echo '# Docker Start / Run Script' > start.sh && \
     echo 'sed -i "/sv_password/s/\"\([^\"]*\)\"/\"$SERVER_PASS\"/" serverfiles/csgo/cfg/csgoserver.cfg' >> start.sh && \
     echo 'sed -i "/sv_lan/s/\"\([^\"]*\)\"/\"$SERVER_LAN\"/" serverfiles/csgo/cfg/csgoserver.cfg' >> start.sh && \
     echo 'sed -i "/sv_region/s/\"\([^\"]*\)\"/\"$SERVER_REGION\"/" serverfiles/csgo/cfg/csgoserver.cfg' >> start.sh && \
-    echo 'sed -i '\''s/""/"/g'\'' serverfiles/csgo/cfg/csgo-server.cfg' >> start.sh && \
+    echo 'sed -i '\''s/""/"/g'\'' serverfiles/csgo/cfg/csgoserver.cfg' >> start.sh && \
+    echo 'sed -i '\''/gslt=/s/"\([^"]*\)"/"$GSLT"/'\'' ./lgsm/config-lgsm/csgoserver/common.cfg' >>  start.sh && \
     echo '# ------------------' >> start.sh && \
     echo '' >> start.sh && \
     echo '# Script Manager' >> start.sh && \
 #     echo './csgoserver auto-install' >> start.sh && \
-#     echo './csgoserver update' >> start.sh && \
+     echo './csgoserver update' >> start.sh && \
 #     echo './csgoserver details' >> start.sh && \
     echo './csgoserver' >> start.sh && \
-    echo './csgoserver start' >> start.sh && \
-    echo 'tmux attach-session' >> start.sh && \
+    echo './csgoserver debug' >> start.sh && \
+#    echo 'tmux attach-session' >> start.sh && \
     chmod +x start.sh
 
 # Make Steam 1st time Autentiaction (used to setup cached cradentuals for accounts with 2 factor authentication)
@@ -161,6 +169,9 @@ RUN echo '# Steam 1st time Autentiaction (used to setup cached cradentuals for a
     echo 'sed -i "/steampass=/s/\"\([^\"]*\)\"/\"\"/" csgoserver  # CLEAR PASSWORD FIELD in csgoserver script' >> steam-login.sh && \
     chmod +x steam-login.sh
 
+# Remove debug prompt, use Debug to run in foreground to keep the container from dying.
+RUN sed -i 71,74d lgsm/functions/command_debug.sh
+
 # Run Start Script
 # https://labs.ctl.io/dockerfile-entrypoint-vs-cmd/
 # http://stackoverflow.com/questions/21553353/what-is-the-difference-between-cmd-and-entrypoint-in-a-dockerfile
@@ -168,6 +179,6 @@ RUN echo '# Steam 1st time Autentiaction (used to setup cached cradentuals for a
 # http://www.markbetz.net/2014/03/17/docker-run-startup-scripts-then-exit-to-a-shell/
 # http://crosbymichael.com/dockerfile-best-practices.html
 # https://blog.phusion.nl/2015/01/20/docker-and-the-pid-1-zombie-reaping-problem/
-# ENTRYPOINT ["./csgoserver"]  # does not work the way I want to.
-CMD ["/bin/bash", "-c", "set -e && /home/csgoserver/start.sh"]
+# ENTRYPOINT ["/home/csgoserver/start.sh"]
+CMD ["/bin/bash", "-l", "-c", "set -e && /home/csgoserver/start.sh"]
 # CMD bash -c 'exec /home/csgoserver/start.sh';'bash'
